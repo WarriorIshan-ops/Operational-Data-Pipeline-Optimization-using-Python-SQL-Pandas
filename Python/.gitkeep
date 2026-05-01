@@ -1,1 +1,97 @@
+df = pd.read_csv('/content/supply_chain_raw_orders.csv')
+df.head()
 
+#DATA CLEANING (ETL Step 1)
+# Check data types
+df.info()
+
+# Check missing values
+df.isnull().sum()
+
+# View unique values
+df['Supplier'].unique()
+df['Region'].unique()
+df['Delivery_Status'].unique()
+
+#FIX DATES (Transform Step 1)
+# Convert dates to proper format
+df['Order_Date'] = pd.to_datetime(df['Order_Date'], errors='coerce')
+df['Delivery_Date'] = pd.to_datetime(df['Delivery_Date'], errors='coerce')
+
+# Check again
+df.info()
+df[['Order_Date', 'Delivery_Date']].head()
+
+#NEXT STEP: FIX COST COLUMN
+# Convert Cost to numeric
+df['Cost'] = pd.to_numeric(df['Cost'], errors='coerce')
+
+# Check result
+df.info()
+df['Cost'].head()
+
+#NEXT STEP: HANDLE MISSING VALUES (Critical Step)
+# Drop rows with missing dates
+df = df.dropna(subset=['Order_Date', 'Delivery_Date'])
+
+# Fill missing Cost with average
+df['Cost'] = df['Cost'].fillna(df['Cost'].mean())
+
+# Check again
+df.isnull().sum()
+df.head()
+
+#Now run the delay calcul#ation:
+
+df['Delay_Days'] = (df['Delivery_Date'] - df['Order_Date']).dt.days
+
+df[['Order_Date', 'Delivery_Date', 'Delay_Days']].head()
+
+#Delay_Days <= 5 → On Time  
+#Delay_Days > 5 → Delayed
+
+# Create new status based on logic
+df['New_Status'] = df['Delay_Days'].apply(lambda x: 'On Time' if x <= 5 else 'Delayed')
+
+# Compare with original
+df[['Delay_Days', 'Delivery_Status', 'New_Status']].head()
+
+#AGGREGATIONS (Make it analysis-ready)
+
+#This step turns your pipeline into something useful for dashboards / stakeholders.
+#Delay % by Supplier
+
+supplier_summary = df.groupby('Supplier').agg(
+    total_orders=('Order_ID', 'count'),
+    delayed_orders=('New_Status', lambda x: (x == 'Delayed').sum())
+)
+
+supplier_summary['delay_percentage'] = (
+    supplier_summary['delayed_orders'] / supplier_summary['total_orders'] * 100
+)
+
+supplier_summary
+
+#Delay % by Region
+
+region_summary = df.groupby('Region').agg(
+    total_orders=('Order_ID', 'count'),
+    delayed_orders=('New_Status', lambda x: (x == 'Delayed').sum())
+)
+
+region_summary['delay_percentage'] = (
+    region_summary['delayed_orders'] / region_summary['total_orders'] * 100
+)
+
+region_summary
+
+
+#Total Delay Impact
+total_delay = df['Delay_Days'].sum()
+total_delay
+
+#1. Average delay per supplier
+df.groupby('Supplier')['Delay_Days'].mean()
+
+#2. Worst performing region
+df.groupby('Region')['Delay_Days'].mean().sort_values(ascending=False)
