@@ -32,7 +32,7 @@ data/
 │ └── supply_chain_raw_orders.csv
 │
 └── processed/
-└── clean_supply_chain_data.csv
+└── supply_chain_raw_orders (1).csv
 
 notebooks/
 └── etl_pipeline.ipynb
